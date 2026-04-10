@@ -21,88 +21,97 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 ## Tables:
 
 //Tablas de Catálogo y Localización - Estas tablas evitan la duplicidad de datos y permiten filtrar por origen y categoría.
-## paisesOrigen: Almacena los países donde se compran los insumos originales.
- - paisId (SERIAL PK)
- - nombre
- - codigoISO
- - activo (BOOLEAN)
+## paises: Almacena los países donde se compran los insumos originales.
+ - paisId: SERIAL (PK)
+ - nombre: VARCHAR (100)
+ - codigoISO: VARCHAR (5)
+ - activo: BOOLEAN
 
 
 ## categoriasBase: Define si el producto es cosmética, aromaterapia, bebida, etc.
- - categoriaId (SERIAL PK)
- - nombre 
- - descripcion
+ - categoriaId: SERIAL (PK)
+ - nombre: VARCHAR(100)
+ - descripcion: TEXT
 
 ## proveedores: Empresas internacionales que suministran los productos en granel.
-- proveedorId (SERIAL PK)-
-- nombre 
-- paisId (FK)
-- contacto_legal
+- proveedorId: SERIAL (PK)
+- nombre: VARCHAR(150)
+- paisId: INT (FK)
+- contactoLegal: TEXT
+
+## unidades_medida: Define las unidades para el manejo de bulk (Litros, Kilogramos, Unidades).
+- unidadMedidaId: SERIAL (PK)
+- nombre: VARCHAR (30) -- Ej: 'Litros'
+- abreviatura: VARCHAR (5) -- Ej: 'L'
+
+## estadosTrazabilidad: Catálogo de estados por los que pasa un producto en el HUB.
+- estadoTrazabilidadId: SERIAL (PK)
+- nombre: VARCHAR (50) -- Ej: 'Recibido', 'Etiquetado', 'Despachado', 'Retenido'
+
 
 //Gestión de Productos e Inventario (Sourcing)
 //Enfocada en el almacenamiento en el HUB de Nicaragua y la gestión de costos en dólares.
 ## productosBase: El producto sin marca (ej. Aceite de Lavanda puro).
-- productoBaseId (SERIAL PK)
-- nombre
-- categoriaId (FK)
-- unidadMedida (ej. litros, kg)
-- descripcionTecnica
+- productoBaseId: SERIAL (PK)
+- nombre: VARCHAR(150)
+- categoriaId: INT (FK)
+- unidadMedidaId: INT -> Referencia a la tabla unidades_medida
+- descripcionTecnica: TEXT
 
 
 ## lotesImportacion: Crucial para la trazabilidad hacia atrás.
-- loteId (SERIAL PK)
-- codigoLote (UNIQUE), 
-- productoBaseId (FK) 
-- proveedorId (FK)
-- cantidadInicial
-- stockActual 
-- fechaArribo (TIMESTAMPTZ)
+- loteId: SERIAL (PK)
+- codigoLote: VARCHAR(50)
+- productoBaseId: INT (FK) 
+- proveedorId: INT (FK)
+- cantidadInicial: NUMERIC(12,2) //Representa el total que ingresó al HUB
+- stockActual: NUMERIC(12,2)  //Es la cantidad disponible que disminuye conforme se etiqueta para Dynamic Brands.
+- fechaArribo: TIMESTAMPTZ
 
 
 ## tiposCostoImportacion: Catálogo de gastos (Aranceles, Fletes, Seguros, Gastos Aduaneros).
-- tipoCostoId (SERIAL PK)
-- nombre
-- descripcion
+- tipoCostoId: SERIAL (PK)
+- nombre: VARCHAR(50)
+- descripcion: TEXT
 
 
 ## costosImportacionDetalle: Permite a la gerencia calcular la rentabilidad real sumando todos los costos asociados al lote.
-- costoId(SERIAL PK)
-- loteId (FK) 
-- tipoCostoId(FK) 
-- montoUSD
+- costoId: SERIAL (PK)
+- loteId: INT (FK) 
+- tipoCostoId: INT (FK) 
+- montoUSD: NUMERIC(15,2) 
 
 // Logística de Salida y Trazabilidad
 // Esta sección conecta con el sistema de Dynamic Brands (MySQL) para el etiquetado y cumplimiento legal.
 ## requisitosLegalesPais: Almacena permisos de salud o regulaciones específicas (ej. requisitos para productos de "ingesta").
-- requisitoId (SERIAL PK) 
-- productoBaseId(FK)
-- codigoISOPaisDestino
-- descripcionPermiso
-- urlDocumentoLegal
+- requisitoId: SERIAL (PK) 
+- productoBaseId:INT(FK)
+- paisDestinoId: INT (FK) -> paises.pais_id
+- descripcionPermiso: TEXT
+- urlDocumentoLegal: VARCHAR(512)
 
 
-## trazabilidad_hub: Registra el "matrimonio" entre el producto bulk y la orden específica de una marca blanca.
-- trazabilidadId (UUID PK)
-- loteId (FK) 
-- ordenIdExterna (INT - ID de MySQL)
-- fechaProcesado
-- operarioId
-- estadoFinal (ej. Etiquetado, Despachado).
-
+## trazabilidadHub: Registra el "matrimonio" entre el producto bulk y la orden específica de una marca blanca.
+- trazabilidadId: (UUID PK, DEFAULT gen_random_uuid()) //El uso de UUID es ideal para llaves primarias que deben ser únicas a través de diferentes sistemas o bases de datos
+- loteId: INT (FK) -> lotes_importacion.lote_id
+- ordenIdExterna:INT -- Referencia a Dynamic Brands (MySQL)
+- estadoTrazabilidadId: INT (FK) -> estados_trazabilidad.estado_trazabilidad_id
+- fechaProcesado:TIMESTAMPTZ
+- operarioId:INT
 
 ## couriers: Terceros encargados de la entrega final.
-- courierId (SERIAL PK)
-- nombre
-- contacto 
-- activo (BOOLEAN)
+- courierId: SERIAL (PK)
+- nombre: VARCHAR(100)
+- contacto: TEXT 
+- activo: BOOLEAN
 
 // Patrones de Logging y Auditoría
 // Diseñada bajo el patrón de log estructurado para reconstruir fallos en los Stored Procedures.
-## bitacora_sp_logistica: Registra cada paso de los procesos transaccionales.
-- logId (SERIAL PK)
-- procesoNombre
-- pasoDescripcion 
-- estado (INFO, ERROR, SUCCESS)
-- codigoSqlstate
-- mensajeJson (JSONB para flexibilidad)
-- fechaRegistro (TIMESTAMPTZ)
+## bitacoraSPLogistica: Registra cada paso de los procesos transaccionales.
+- logId: SERIAL (PK)
+- procesoNombre: VARCHAR(100)
+- pasoDescripcion: TEXT
+- estado: VARCHAR(20)
+- codigoSqlstate: VARCHAR(5)
+- mensajeJson: JSONB
+- fechaRegistro: TIMESTAMPTZ

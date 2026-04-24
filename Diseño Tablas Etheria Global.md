@@ -23,95 +23,284 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 //Tablas de Catálogo y Localización - Estas tablas evitan la duplicidad de datos y permiten filtrar por origen y categoría.
 ## paises: Almacena los países donde se compran los insumos originales.
  - paisId: SERIAL (PK)
- - nombre: VARCHAR (100)
- - codigoISO: VARCHAR (5)
+ - nombre: VARCHAR (100) UNIQUE
+ - codigoISO: VARCHAR (5) UNIQUE
+ - monedaLocalId: INT (FK) ->monedas -- Referencia a tabla monedas
  - activo: BOOLEAN
+ - createdAt: TIMESTAMPTZ DEFAULT NOW()
+ - actualizadoPor: INT (FK) -> personas
+ - computadoraId: INT -- ID del terminal/estación
+ - deleted: BOOLEAN DEFAULT FALSE
+ 
+## provinciasEstados (NUEVA)
+- provinciaEstadoId: SERIAL (PK)
+- paisId: INT (FK) -> paises
+- nombre: VARCHAR(100)
+- codigoPostalOpcional: VARCHAR(20)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## ciudades (NUEVA)
+- ciudadId: SERIAL (PK)
+- provinciaEstadoId: INT (FK) -> provinciasEstados
+- nombre: VARCHAR(100)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## direcciones
+- direccionId: SERIAL (PK)
+- ciudadId: INT (FK) -> ciudades //Eliminé paisId y provinciaEstado de aquí porque ya se obtienen a través de ciudadId (Normalización).
+- detalles: VARCHAR(255) 
+- updatedAt: TIMESTAMPTZ //Para rastrear cambios de domicilio
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## personas
+- personaId: SERIAL (PK)
+- cedulaIdentidad: VARCHAR(50) UNIQUE
+- nombre: VARCHAR(100)
+- primerApellido: VARCHAR(100)
+- segundoApellido: VARCHAR(100)
+- email: VARCHAR(150) UNIQUE
+- telefono: VARCHAR(20)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## monedas
+- monedaId: SERIAL (PK)
+- nombre: VARCHAR(50) UNIQUE
+- codigoISO: VARCHAR(3) UNIQUE -- Ej: USD, CRC, NIO
+- simbolo: VARCHAR(5)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## exchangeRates
+- exchangeRateId: SERIAL (PK)
+- monedaOrigenId: INT (FK) -> monedas (La moneda que quieres convertir)
+- monedaDestinoId: INT (FK) -> monedas (Generalmente USD, pero se deja flexible)
+- valorCompra: NUMERIC(12,6) -- Cantidad de moneda origen para comprar 1 unidad de destino
+- valorVenta: NUMERIC(12,6)
+- fechaRegistro: TIMESTAMPTZ DEFAULT NOW() -- Fecha y hora exacta de la tasa
+- fechaEfectiva: DATE -- La fecha para la cual aplica esta tasa (útil para tasas oficiales de bancos)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
 
-## categoriasBase: Define si el producto es cosmética, aromaterapia, bebida, etc.
- - categoriaId: SERIAL (PK)
- - nombre: VARCHAR(100)
- - descripcion: TEXT
 
+//Entidades y productos
 ## proveedores: Empresas internacionales que suministran los productos en granel.
 - proveedorId: SERIAL (PK)
-- nombre: VARCHAR(150)
-- paisId: INT (FK)
-- contactoLegal: TEXT
+- cedulaJuridica: VARCHAR(50) UNIQUE
+- nombreComercial: VARCHAR(150)
+- direccionId: INT (FK) -> direcciones
+- telefonoOficina: VARCHAR(20)
+- activo: BOOLEAN
+- createdAt: TIMESTAMPTZ DEFAULT NOW()
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
-## unidades_medida: Define las unidades para el manejo de bulk (Litros, Kilogramos, Unidades).
-- unidadMedidaId: SERIAL (PK)
-- nombre: VARCHAR (30) -- Ej: 'Litros'
-- abreviatura: VARCHAR (5) -- Ej: 'L'
-
-## estadosTrazabilidad: Catálogo de estados por los que pasa un producto en el HUB.
-- estadoTrazabilidadId: SERIAL (PK)
-- nombre: VARCHAR (50) -- Ej: 'Recibido', 'Etiquetado', 'Despachado', 'Retenido'
-
+## proveedoresContactosLegales: (N a N) //REVISAR ESTA TABLA PORQUE ES NUEVA
+- proveedorId: INT (FK) -> proveedores
+- personaId: INT (FK) -> personas
+- rol: VARCHAR(50) -- Ej: 'Representante Legal', 'Agente Aduanero'
+- PRIMARY KEY (proveedorId, personaId)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
 //Gestión de Productos e Inventario (Sourcing)
 //Enfocada en el almacenamiento en el HUB de Nicaragua y la gestión de costos en dólares.
+## categoriasBase REVISAR TABLA ES NUEVA
+- categoriaId: SERIAL (PK)
+- nombre: VARCHAR(100) UNIQUE
+- descripcion: VARCHAR(255)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## unidadesMedida: Define las unidades para el manejo de bulk (Litros, Kilogramos, Unidades).
+- unidadMedidaId: SERIAL (PK)
+- nombre: VARCHAR (30) UNIQUE -- Ej: 'Litros'
+- abreviatura: VARCHAR (5) -- Ej: 'L'
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
 ## productosBase: El producto sin marca (ej. Aceite de Lavanda puro).
 - productoBaseId: SERIAL (PK)
 - nombre: VARCHAR(150)
-- categoriaId: INT (FK)
-- unidadMedidaId: INT -> Referencia a la tabla unidades_medida
-- descripcionTecnica: TEXT
+- categoriaId: INT (FK) -> categoriasBase
+- unidadMedidaId: INT (FK)-> unidadesMedida
+- descripcionTecnica: VARCHAR(255)
+- updatedAt: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
+## ubicacionesHub REVISAR TABLA NUEVA
+- ubicacionId: SERIAL (PK)
+- codigoPasillo: VARCHAR(10)
+- estante: VARCHAR(10)
+- nivel: VARCHAR(10)
+- capacidadMax: NUMERIC(12,2)
+- UNIQUE (codigoPasillo, estante, nivel) -- Evita duplicidad de espacio físico
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
-## lotesImportacion: Crucial para la trazabilidad hacia atrás.
+//Compras e Inventario (Patrón Transaccional)
+Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
+
+## ordenesCompra TABLA NUEVA
+- ordenCompraId: SERIAL (PK)
+- proveedorId: INT (FK) -> proveedores
+- fechaEmision: TIMESTAMPTZ
+- estado: VARCHAR(20) -- 'Pendiente', 'Pagada', 'En Transito', 'Recibida', 'Devuelta'
+- monedaCompraId: INT (FK) -> monedas
+- tipoCambioAUSD: NUMERIC(12,6)
+- updatedAt: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## ordenesCompraDetalle TABLA NUEVA
+- detalleOCId: SERIAL (PK)
+- ordenCompraId: INT (FK)
+- productoBaseId: INT (FK)
+- cantidadPedida: NUMERIC(12,2)
+- precioUnitarioMonedaOrigen: NUMERIC(15,2)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## lotesImportacion TABLA NUEVA
 - loteId: SERIAL (PK)
-- codigoLote: VARCHAR(50)
-- productoBaseId: INT (FK) 
-- proveedorId: INT (FK)
-- cantidadInicial: NUMERIC(12,2) //Representa el total que ingresó al HUB
-- stockActual: NUMERIC(12,2)  //Es la cantidad disponible que disminuye conforme se etiqueta para Dynamic Brands.
+- codigoLote: VARCHAR(50) -- Del proveedor
+- detalleOCId: INT (FK) -> ordenesCompraDetalle
+- fechaProduccion: DATE
+- fechaVencimiento: DATE
+- createdAt: TIMESTAMPTZ DEFAULT NOW()
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+
+## inventarioHub (Registro de Stock Real) TABLA NUEVA
+- inventarioId: SERIAL (PK)
+- loteId: INT (FK) -> lotesImportacion
+- ubicacionId: INT (FK) -> ubicacionesHub
+- cantidadDisponible: NUMERIC(12,2) -- Solo se llena cuando llega al HUB
 - fechaArribo: TIMESTAMPTZ
+- estadoCalidad: VARCHAR(20)
+- versionLock: INT DEFAULT 0 //Para control de concurrencia (evita errores en ventas simultáneas)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE //Para dar de baja stock por daño/pérdida
 
 
-## tiposCostoImportacion: Catálogo de gastos (Aranceles, Fletes, Seguros, Gastos Aduaneros).
+//Costos y Finanzas (Patrón de Transacciones)
+//Manejo de entradas/salidas de dinero y documentos legales (DUA).
+## tiposCostoImportacion NUEVA TABLA
 - tipoCostoId: SERIAL (PK)
-- nombre: VARCHAR(50)
-- descripcion: TEXT
+- nombre: VARCHAR(50) UNIQUE
+- esEntrada: BOOLEAN -- Para diferenciar ingresos/egresos
+- descripcion: VARCHAR(255)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## transaccionesCostos (Patrón de Transacción) NUEVA TABLA
+- transaccionId: SERIAL (PK)
+- ordenCompraId: INT (FK) -> ordenesCompra
+- tipoCostoId: INT (FK) -> tiposCostoImportacion
+- monedaOriginalId: INT (FK) -> monedas
+- montoOriginal: NUMERIC(15,2)
+- tipoCambioUSD: NUMERIC(12,6)
+- montoUSD: NUMERIC(15,2) -- Calculado
+- numeroDocumento: VARCHAR(100) -- Referencia a DUA, Factura o Comprobante
+- urlDocumento: VARCHAR(512)
+- hashDocumento: VARCHAR(64) -- Checksum (SHA-256) para integridad del DUA
+- fechaTransaccion: TIMESTAMPTZ DEFAULT NOW()
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
 
-## costosImportacionDetalle: Permite a la gerencia calcular la rentabilidad real sumando todos los costos asociados al lote.
-- costoId: SERIAL (PK)
-- loteId: INT (FK) 
-- tipoCostoId: INT (FK) 
-- montoUSD: NUMERIC(15,2) 
+//Logística de Salida y Cumplimiento
+//Conexión con Dynamic Brands y requisitos legales por país.
+## tiposRequisitos (NUEVA)
+// Para clasificar si el documento es de salud, aduanero o técnico.
+- tipoRequisitoId: SERIAL (PK)
+- nombre: VARCHAR(100) -- Ej: 'Registro Sanitario', 'Certificado Libre Venta'
+- descripcion: VARCHAR(255)
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
 
-// Logística de Salida y Trazabilidad
-// Esta sección conecta con el sistema de Dynamic Brands (MySQL) para el etiquetado y cumplimiento legal.
-## requisitosLegalesPais: Almacena permisos de salud o regulaciones específicas (ej. requisitos para productos de "ingesta").
-- requisitoId: SERIAL (PK) 
-- productoBaseId:INT(FK)
-- paisDestinoId: INT (FK) -> paises.pais_id
-- descripcionPermiso: TEXT
+## requisitosLegalesPais NUEVA TABLA
+- requisitoId: SERIAL (PK)
+- tipoRequisitoId: INT (FK) -> tiposRequisitos
+- productoBaseId: INT (FK) -> productosBase
+- paisDestinoId: INT (FK) -> paises
+- nombreRequisito: VARCHAR(150)
 - urlDocumentoLegal: VARCHAR(512)
+- hashValidacion: VARCHAR(64) -- Checksum
+- ultimaRevision: DATE
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## marcasBlancas (NUEVA)
+// Esta tabla es el puente con Dynamic Brands. Registra las marcas que la IA crea.
+- marcaId: SERIAL (PK)
+- nombreMarca: VARCHAR(100) UNIQUE
+- logotipoUrl: VARCHAR(512)
+- paisSedeId: INT (FK) -> paises
+- activo: BOOLEAN DEFAULT TRUE
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+
+## estadosTrazabilidad NUEVA TABLA
+- estadoTrazabilidadId: SERIAL (PK)
+- nombre: VARCHAR(50) -- 'Recibido', 'En Proceso Etiquetado', 'Listo para Courier'
+
+## trazabilidadMovimientos (Log de Inventario) NUEVA TABLA
+- movimientoId: (UUID PK)
+- inventarioId: INT (FK) -> inventarioHub
+- ordenIdExterna: INT -- Referencia a Dynamic Brands (MySQL)
+- marcaId: INT (FK) -> marcasBlancas (Para saber qué etiqueta usar)
+- paisDestinoId: INT (FK) -> paises (Para saber qué requisitos legales aplican al empaque)
+- courierId: INT (FK) -> couriers
+- tipoMovimiento: VARCHAR(50) -- 'Recepcion', 'Etiquetado', 'Despacho', 'Ajuste'
+- cantidad: NUMERIC(12,2)
+- estadoTrazabilidadId: INT (FK)-> estadosTrazabilidad
+- operarioId: INT (FK) ->personas
+- fechaRegistro: TIMESTAMPTZ DEFAULT NOW()
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
 
 
-## trazabilidadHub: Registra el "matrimonio" entre el producto bulk y la orden específica de una marca blanca.
-- trazabilidadId: (UUID PK, DEFAULT gen_random_uuid()) //El uso de UUID es ideal para llaves primarias que deben ser únicas a través de diferentes sistemas o bases de datos
-- loteId: INT (FK) -> lotes_importacion.lote_id
-- ordenIdExterna:INT -- Referencia a Dynamic Brands (MySQL)
-- estadoTrazabilidadId: INT (FK) -> estados_trazabilidad.estado_trazabilidad_id
-- fechaProcesado:TIMESTAMPTZ
-- operarioId:INT
+//Auditoría de Sistema
+//Control técnico de la ejecución de procesos.
 
-## couriers: Terceros encargados de la entrega final.
-- courierId: SERIAL (PK)
-- nombre: VARCHAR(100)
-- contacto: TEXT 
-- activo: BOOLEAN
-
-// Patrones de Logging y Auditoría
-// Diseñada bajo el patrón de log estructurado para reconstruir fallos en los Stored Procedures.
-## bitacoraSPLogistica: Registra cada paso de los procesos transaccionales.
-- logId: SERIAL (PK)
-- procesoNombre: VARCHAR(100)
-- pasoDescripcion: TEXT
-- estado: VARCHAR(20)
-- codigoSqlstate: VARCHAR(5)
-- mensajeJson: JSONB
+## logsSistema NUEVA TABLA
+- logId: BIGSERIAL (PK)
+- usuarioId: INT
+- accion: VARCHAR(100)
+- tablaAfectada: VARCHAR(50)
+- valorAnterior: JSONB
+- valorNuevo: JSONB
 - fechaRegistro: TIMESTAMPTZ
+- ipOrigen: VARCHAR(45)
+
+
+ 
+

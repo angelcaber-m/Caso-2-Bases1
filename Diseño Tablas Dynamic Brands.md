@@ -310,6 +310,7 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 
 ### rastreosEnvios
 - rastreoEnvioId: serial auto-increment (PK)
+- envioId: FK
 - eventoEnvioId: FK
 - direccionId: FK
 - fecha: timestamp

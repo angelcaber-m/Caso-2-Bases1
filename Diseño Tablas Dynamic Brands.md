@@ -7,7 +7,7 @@ Angélica Cabrera Bermúdez - 2024253434
 Estefanía Portuguez Víquez - 2024800621
 
 -----------------------------------------
-- Database engine: MySQL
+- Database engine: MySQL 9.7
 - Database name: DynamicBrands
 
 - Descripción:

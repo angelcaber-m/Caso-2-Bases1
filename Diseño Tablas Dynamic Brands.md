@@ -256,6 +256,7 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 - montoUSD: decimal(18, 6)
 - exchangeRateId: FK
 - notas: varchar(300)
+- direccionEnvioId: Fk (a direcciones) 
 - activo: boolean default 1
 - deleted: boolean default 0
 - fechaCreacion: timestamp

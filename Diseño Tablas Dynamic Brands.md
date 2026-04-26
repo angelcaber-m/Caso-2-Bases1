@@ -455,7 +455,7 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 - logId: bigint serial auto-increment (PK)
 - userId: int
 - eventTypeId: FK
-- descripcion: varchar(200)
+- descripcion: varchar(500)
 - sourceId: FK
 - severityId: FK
 - referenceId1: bigint null

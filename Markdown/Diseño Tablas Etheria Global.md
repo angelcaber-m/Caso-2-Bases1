@@ -290,17 +290,78 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 
 //Auditoría de Sistema
 //Control técnico de la ejecución de procesos.
+## sources (Orígenes de los eventos)
+- sourceId: SERIAL (PK)
+- nombre: VARCHAR(75) -- Ej: 'App Móvil', 'Portal Web', 'API Sourcing'
+- descripcion: VARCHAR(200)
+- fechaCreacion: TIMESTAMPTZ DEFAULT NOW()
+- fechaActualizacion: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+- checksum: BYTEA -- Formato binario para integridad en Postgres
 
-## logsSistema NUEVA TABLA
+## logTypes (Categorías generales de logs)
+- logTypeId: SERIAL (PK)
+- nombre: VARCHAR(75) -- Ej: 'Seguridad', 'Transaccional', 'Sistema'
+- descripcion: VARCHAR(200)
+- fechaCreacion: TIMESTAMPTZ DEFAULT NOW()
+- fechaActualizacion: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+- checksum: BYTEA
+
+## eventTypes (Tipos de eventos específicos) 
+- eventTypeId: SERIAL (PK)
+- logTypeId: INT (FK) -> logTypes
+- nombre: VARCHAR(75) -- Ej: 'Login Exitoso', 'Error de Inventario'
+- descripcion: VARCHAR(200)
+- fechaCreacion: TIMESTAMPTZ DEFAULT NOW()
+- fechaActualizacion: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+- checksum: BYTEA
+
+## severities (Niveles de importancia)
+- severityId: SERIAL (PK)
+- nombre: VARCHAR(75) -- Ej: 'Crítico', 'Error', 'Advertencia', 'Info'
+- descripcion: VARCHAR(200)
+- fechaCreacion: TIMESTAMPTZ DEFAULT NOW()
+- fechaActualizacion: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+- checksum: BYTEA
+
+## dataObjects (Catálogo de tablas/objetos del sistema)
+- dataObjectId: SERIAL (PK)
+- nombre: VARCHAR(75) -- Ej: 'ordenesCompra', 'inventarioHub'
+- descripcion: VARCHAR(200)
+- fechaCreacion: TIMESTAMPTZ DEFAULT NOW()
+- fechaActualizacion: TIMESTAMPTZ
+- actualizadoPor: INT (FK) -> personas
+- computadoraId: INT
+- deleted: BOOLEAN DEFAULT FALSE
+- checksum: BYTEA
+
+## logs (Registro histórico de actividad)
 - logId: BIGSERIAL (PK)
-- usuarioId: INT
-- accion: VARCHAR(100)
-- tablaAfectada: VARCHAR(50)
-- valorAnterior: JSONB
-- valorNuevo: JSONB
-- fechaRegistro: TIMESTAMPTZ
-- ipOrigen: VARCHAR(45)
-
+- userId: INT (FK) -> personas
+- eventTypeId: INT (FK) -> eventTypes
+- descripcion: VARCHAR(500)
+- sourceId: INT (FK) -> sources
+- severityId: INT (FK) -> severities
+- referenceId1: BIGINT NULL -- ID del registro afectado (ej: id de una factura)
+- referenceId2: BIGINT NULL
+- referenceDesc1: VARCHAR(200) NULL
+- referenceDesc2: VARCHAR(200) NULL
+- dataObjectId1: INT (FK) -> dataObjects NULL
+- dataObjectId2: INT (FK) -> dataObjects NULL
+- fechaRegistro: TIMESTAMPTZ DEFAULT NOW()
+- computadoraId: INT
+- checksum: BYTEA
 
  
 

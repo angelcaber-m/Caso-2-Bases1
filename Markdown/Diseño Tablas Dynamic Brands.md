@@ -253,7 +253,7 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 - estadoOrdenId: FK
 - monedaId: FK
 - montoLocal: decimal(18, 6)
-- montoUSD: decimal(18, 6)
+- monto: decimal(18, 6)
 - exchangeRateId: FK
 - notas: varchar(300)
 - direccionEnvioId: Fk (a direcciones) 
@@ -271,7 +271,7 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 - monedaId: FK
 - precioUnitario: numeric(10,2)
 - montoLocal: decimal(18, 6)
-- montoUSD: decimal(18, 6)
+- monto: decimal(18, 6)
 - exchangeRateId: FK
 - fechaCreacion: timestamp
 - fechaActualizacion: timestamp
@@ -342,7 +342,7 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 - tipoCostoId: int
 - monedaId: FK
 - montoLocal: decimal(18, 6)
-- montoUSD: decimal(18, 6)
+- monto: decimal(18, 6)
 - exchangeRateId: FK
 - fechaCreacion: timestamp
 - fechaActualizacion: timestamp
@@ -385,9 +385,9 @@ Esta es una empresa de base tecnológica. Han desarrollado una IA capaz de gener
 - monedaLocal: FK (a monedas)
 - exchangeRateId: FK
 - montoLocalAnterior: decimal(18, 6)
-- montoUSDAnterior: decimal(18, 6)
+- montoAnterior: decimal(18, 6)
 - montoLocalNuevo: decimal(18, 6)
-- montoUSDNuevo: decimal(18, 6)
+- montoNuevo: decimal(18, 6)
 - comentario: varchar (150)
 - fechaRegistro: timestamp
 - registradoPor: int

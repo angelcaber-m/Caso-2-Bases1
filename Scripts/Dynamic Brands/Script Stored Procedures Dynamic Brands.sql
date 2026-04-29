@@ -493,13 +493,13 @@ BEGIN
     DECLARE v_ordenId INT;
     DECLARE v_tiendaId, v_clienteId, v_direccionId, v_ciudadId, v_estadoId, v_paisId, v_monedaId, v_usdId, v_exRateId INT;
     DECLARE v_tasa DECIMAL(18,6);
-    DECLARE v_montoLocalTotal, v_montoUSDTotal DECIMAL(18,6) DEFAULT 0;
+    DECLARE v_montoLocalTotal, v_montoTotal DECIMAL(18,6) DEFAULT 0;
     DECLARE i INT DEFAULT 0;
     DECLARE v_count INT DEFAULT 0;
     DECLARE v_prod_cant INT;
     DECLARE v_productoMarcaId INT;
     DECLARE v_prod_nombre VARCHAR(50);
-    DECLARE v_prod_precio, v_prod_montoLocal, v_prod_montoUSD DECIMAL(18,6);
+    DECLARE v_prod_precio, v_prod_montoLocal, v_prod_monto DECIMAL(18,6);
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION 
     BEGIN
@@ -535,11 +535,11 @@ BEGIN
         SET v_montoLocalTotal = v_montoLocalTotal + (v_prod_cant * v_prod_precio);
         SET i = i + 1;
     END WHILE;
-    SET v_montoUSDTotal = v_montoLocalTotal * v_tasa;
+    SET v_montoTotal = v_montoLocalTotal * v_tasa;
 
     -- Inserción Orden e Historial Inicial
-    INSERT INTO ordenes (tiendaId, clienteId, estadoOrdenId, monedaId, direccionEnvioId, montoLocal, montoUSD, exchangeRateId, notas)
-    VALUES (v_tiendaId, v_clienteId, v_estadoId, v_monedaId, v_direccionId, v_montoLocalTotal, v_montoUSDTotal, v_exRateId, p_notas);
+    INSERT INTO ordenes (tiendaId, clienteId, estadoOrdenId, monedaId, direccionEnvioId, montoLocal, monto, exchangeRateId, notas)
+    VALUES (v_tiendaId, v_clienteId, v_estadoId, v_monedaId, v_direccionId, v_montoLocalTotal, v_montoTotal, v_exRateId, p_notas);
     SET v_ordenId = LAST_INSERT_ID();
     SET p_ordenId = v_ordenId;
 
@@ -556,15 +556,15 @@ BEGIN
         SET v_prod_cant = JSON_UNQUOTE(JSON_EXTRACT(p_productos_json, CONCAT('$[', i, '].cantidad')));
         SET v_prod_precio = JSON_UNQUOTE(JSON_EXTRACT(p_productos_json, CONCAT('$[', i, '].precioUnitario')));
         SET v_prod_montoLocal = v_prod_cant * v_prod_precio;
-        SET v_prod_montoUSD = v_prod_montoLocal * v_tasa;
+        SET v_prod_monto = v_prod_montoLocal * v_tasa;
         
         SELECT productoMarcaBlancaId INTO v_productoMarcaId FROM productosMarcasBlancas WHERE nombreComercial = v_prod_nombre LIMIT 1;
         
         IF v_productoMarcaId IS NULL THEN
             CALL sp_registrar_log(CONCAT('Producto NO encontrado: ', v_prod_nombre, ' tiendaId: ', v_tiendaId), 'Excepción', 'Critical', 'Ventas');
         ELSE
-            INSERT INTO productosOrdenes (ordenId, productoMarcaBlancaId, cantidad, monedaId, precioUnitario, montoLocal, montoUSD, exchangeRateId)
-            VALUES (v_ordenId, v_productoMarcaId, v_prod_cant, v_monedaId, v_prod_precio, v_prod_montoLocal, v_prod_montoUSD, v_exRateId);
+            INSERT INTO productosOrdenes (ordenId, productoMarcaBlancaId, cantidad, monedaId, precioUnitario, montoLocal, monto, exchangeRateId)
+            VALUES (v_ordenId, v_productoMarcaId, v_prod_cant, v_monedaId, v_prod_precio, v_prod_montoLocal, v_prod_monto, v_exRateId);
         END IF;
 
         SET i = i + 1;
@@ -619,7 +619,7 @@ CREATE PROCEDURE sp_registrar_costo_logistico_inicial(
 )
 BEGIN
     DECLARE v_ordId, v_exRateId, v_costoId INT;
-    DECLARE v_tasa, v_montoUSD DECIMAL(18,6);
+    DECLARE v_tasa, v_monto DECIMAL(18,6);
     DECLARE v_monedaId INT;
     
     DECLARE EXIT HANDLER FOR SQLEXCEPTION 
@@ -635,17 +635,17 @@ BEGIN
     SELECT monedaId INTO v_monedaId FROM ordenes WHERE ordenId = v_ordId LIMIT 1;
 
     -- 2. CÁLCULOS
-    SET v_montoUSD = p_monto_local * v_tasa;
+    SET v_monto = p_monto_local * v_tasa;
 
     -- 3. ESCRITURAS
-    INSERT INTO costosLogistica (envioId, monedaId, montoLocal, montoUSD, exchangeRateId, tipoCostoId)
-    VALUES (p_envio_id, v_monedaId, p_monto_local, v_montoUSD, v_exRateId, p_tipo_costo_id);
+    INSERT INTO costosLogistica (envioId, monedaId, montoLocal, monto, exchangeRateId, tipoCostoId)
+    VALUES (p_envio_id, v_monedaId, p_monto_local, v_monto, v_exRateId, p_tipo_costo_id);
     
     SET v_costoId = LAST_INSERT_ID();
 
     -- Registro en Historial de Costos (Movimiento Inicial)
-    INSERT INTO historialCostosLogistica (costoLogisticaId, monedaLocal, exchangeRateId, montoLocalAnterior, montoUSDAnterior, montoLocalNuevo, montoUSDNuevo, comentario)
-    VALUES (v_costoId, v_monedaId, v_exRateId, 0.00, 0.00, p_monto_local, v_montoUSD, 'Apertura de costos de envío');
+    INSERT INTO historialCostosLogistica (costoLogisticaId, monedaLocal, exchangeRateId, montoLocalAnterior, montoAnterior, montoLocalNuevo, montoNuevo, comentario)
+    VALUES (v_costoId, v_monedaId, v_exRateId, 0.00, 0.00, p_monto_local, v_monto, 'Apertura de costos de envío');
 
     -- 4. REGISTRO DE LOG
     CALL sp_registrar_log(CONCAT('Costo logístico registrado. ID: ', v_costoId, ' para Envío: ', p_envio_id), 'Paso Completado', 'Info', 'Finanzas');
@@ -712,9 +712,9 @@ DELIMITER ;
 -- LLamados para ejecutar los stored procedures --
 
 USE DynamicBrands;
---Llenado de datos base
+-- Llenado de datos base
 CALL sp_ejecutar_llenado_total();
---Llenado de ordenes y envios
+-- Llenado de ordenes y envios
 CALL sp_llenado_transaccional_masivo();
 
 

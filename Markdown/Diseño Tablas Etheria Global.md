@@ -32,7 +32,7 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
  - computadoraId: INT -- ID del terminal/estación
  - deleted: BOOLEAN DEFAULT FALSE
  
-## provinciasEstados (NUEVA)
+## provinciasEstados
 - provinciaEstadoId: SERIAL (PK)
 - paisId: INT (FK) -> paises
 - nombre: VARCHAR(100)
@@ -41,7 +41,7 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## ciudades (NUEVA)
+## ciudades
 - ciudadId: SERIAL (PK)
 - provinciaEstadoId: INT (FK) -> provinciasEstados
 - nombre: VARCHAR(100)
@@ -106,7 +106,7 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## proveedoresContactosLegales: (N a N) //REVISAR ESTA TABLA PORQUE ES NUEVA
+## proveedoresContactosLegales: (N a N)
 - proveedorId: INT (FK) -> proveedores
 - personaId: INT (FK) -> personas
 - rol: VARCHAR(50) -- Ej: 'Representante Legal', 'Agente Aduanero'
@@ -117,7 +117,7 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 
 //Gestión de Productos e Inventario (Sourcing)
 //Enfocada en el almacenamiento en el HUB de Nicaragua y la gestión de costos en dólares.
-## categoriasBase REVISAR TABLA ES NUEVA
+## categoriasBase 
 - categoriaId: SERIAL (PK)
 - nombre: VARCHAR(100) UNIQUE
 - descripcion: VARCHAR(255)
@@ -144,7 +144,7 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## ubicacionesHub REVISAR TABLA NUEVA
+## ubicacionesHub 
 - ubicacionId: SERIAL (PK)
 - codigoPasillo: VARCHAR(10)
 - estante: VARCHAR(10)
@@ -158,19 +158,19 @@ Esta empresa se encarga de la cadena de suministro. Importan productos naturales
 //Compras e Inventario (Patrón Transaccional)
 Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 
-## ordenesCompra TABLA NUEVA
+## ordenesCompra 
 - ordenCompraId: SERIAL (PK)
 - proveedorId: INT (FK) -> proveedores
 - fechaEmision: TIMESTAMPTZ
 - estado: VARCHAR(20) -- 'Pendiente', 'Pagada', 'En Transito', 'Recibida', 'Devuelta'
 - monedaCompraId: INT (FK) -> monedas
-- tipoCambioAUSD: NUMERIC(12,6)
+- tipoCambio: NUMERIC(12,6)
 - updatedAt: TIMESTAMPTZ
 - actualizadoPor: INT (FK) -> personas
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## ordenesCompraDetalle TABLA NUEVA
+## ordenesCompraDetalle 
 - detalleOCId: SERIAL (PK)
 - ordenCompraId: INT (FK)
 - productoBaseId: INT (FK)
@@ -180,7 +180,7 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## lotesImportacion TABLA NUEVA
+## lotesImportacion 
 - loteId: SERIAL (PK)
 - codigoLote: VARCHAR(50) -- Del proveedor
 - detalleOCId: INT (FK) -> ordenesCompraDetalle
@@ -192,7 +192,7 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 - deleted: BOOLEAN DEFAULT FALSE
 
 
-## inventarioHub (Registro de Stock Real) TABLA NUEVA
+## inventarioHub (Registro de Stock Real) 
 - inventarioId: SERIAL (PK)
 - loteId: INT (FK) -> lotesImportacion
 - ubicacionId: INT (FK) -> ubicacionesHub
@@ -207,7 +207,7 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 
 //Costos y Finanzas (Patrón de Transacciones)
 //Manejo de entradas/salidas de dinero y documentos legales (DUA).
-## tiposCostoImportacion NUEVA TABLA
+## tiposCostoImportacion 
 - tipoCostoId: SERIAL (PK)
 - nombre: VARCHAR(50) UNIQUE
 - esEntrada: BOOLEAN -- Para diferenciar ingresos/egresos
@@ -216,14 +216,14 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## transaccionesCostos (Patrón de Transacción) NUEVA TABLA
+## transaccionesCostos (Patrón de Transacción) 
 - transaccionId: SERIAL (PK)
 - ordenCompraId: INT (FK) -> ordenesCompra
 - tipoCostoId: INT (FK) -> tiposCostoImportacion
 - monedaOriginalId: INT (FK) -> monedas
 - montoOriginal: NUMERIC(15,2)
-- tipoCambioUSD: NUMERIC(12,6)
-- montoUSD: NUMERIC(15,2) -- Calculado
+- tipoCambio: NUMERIC(12,6)
+- montoCalculado: NUMERIC(15,2) -- Calculado
 - numeroDocumento: VARCHAR(100) -- Referencia a DUA, Factura o Comprobante
 - urlDocumento: VARCHAR(512)
 - hashDocumento: VARCHAR(64) -- Checksum (SHA-256) para integridad del DUA
@@ -235,7 +235,7 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 
 //Logística de Salida y Cumplimiento
 //Conexión con Dynamic Brands y requisitos legales por país.
-## tiposRequisitos (NUEVA)
+## tiposRequisitos 
 // Para clasificar si el documento es de salud, aduanero o técnico.
 - tipoRequisitoId: SERIAL (PK)
 - nombre: VARCHAR(100) -- Ej: 'Registro Sanitario', 'Certificado Libre Venta'
@@ -244,7 +244,7 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## requisitosLegalesPais NUEVA TABLA
+## requisitosLegalesPais 
 - requisitoId: SERIAL (PK)
 - tipoRequisitoId: INT (FK) -> tiposRequisitos
 - productoBaseId: INT (FK) -> productosBase
@@ -257,7 +257,7 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## marcasBlancas (NUEVA)
+## marcasBlancas
 // Esta tabla es el puente con Dynamic Brands. Registra las marcas que la IA crea.
 - marcaId: SERIAL (PK)
 - nombreMarca: VARCHAR(100) UNIQUE
@@ -268,17 +268,17 @@ Separación de Orden de Compra (OC) e Inventario real (Firme) tras arribo.
 - computadoraId: INT
 - deleted: BOOLEAN DEFAULT FALSE
 
-## estadosTrazabilidad NUEVA TABLA
+## estadosTrazabilidad 
 - estadoTrazabilidadId: SERIAL (PK)
 - nombre: VARCHAR(50) -- 'Recibido', 'En Proceso Etiquetado', 'Listo para Courier'
 
-## trazabilidadMovimientos (Log de Inventario) NUEVA TABLA
+## trazabilidadMovimientos (Log de Inventario) 
 - movimientoId: (UUID PK)
 - inventarioId: INT (FK) -> inventarioHub
 - ordenIdExterna: INT -- Referencia a Dynamic Brands (MySQL)
 - marcaId: INT (FK) -> marcasBlancas (Para saber qué etiqueta usar)
+- courierId: VARCHAR(100) 
 - paisDestinoId: INT (FK) -> paises (Para saber qué requisitos legales aplican al empaque)
-- courierId: INT (FK) -> couriers
 - tipoMovimiento: VARCHAR(50) -- 'Recepcion', 'Etiquetado', 'Despacho', 'Ajuste'
 - cantidad: NUMERIC(12,2)
 - estadoTrazabilidadId: INT (FK)-> estadosTrazabilidad

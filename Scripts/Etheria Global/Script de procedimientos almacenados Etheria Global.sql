@@ -21,7 +21,6 @@ BEGIN
         p_usuario_id, p_evento_tipo_id, p_descripcion, p_source_id, 
         p_severity_id, p_data_object_id, p_referencia_id, NOW()
     );
-    -- Nota: El checksum se puede generar mediante un trigger BEFORE INSERT
 END;
 $$;
 
@@ -218,33 +217,23 @@ CREATE OR REPLACE PROCEDURE sp_registrar_ubicaciones_logicas(
 )
 LANGUAGE plpgsql
 AS $$
-DECLARE
-    v_pais_id INT;
-    v_prov_id INT;
-    v_ciu_id INT;
 BEGIN
-    -- EJEMPLO PAÍS 1: NICARAGUA (Sede del HUB)
+    -- 1. NICARAGUA
     INSERT INTO paises (nombre, codigoISO, monedaLocalId, actualizadoPor, computadoraId)
     VALUES ('Nicaragua', 'NI', (SELECT monedaId FROM monedas WHERE codigoISO = 'NIO'), p_actualizado_por, p_computadora_id)
-    RETURNING paisId INTO v_pais_id;
+    ON CONFLICT DO NOTHING;
 
-    INSERT INTO provinciasEstados (paisId, nombre, actualizadoPor, computadoraId)
-    VALUES (v_pais_id, 'Costa Caribe Sur', p_actualizado_por, p_computadora_id) RETURNING provinciaEstadoId INTO v_prov_id;
+    -- 2. FRANCIA
+    INSERT INTO paises (nombre, codigoISO, monedaLocalId, actualizadoPor, computadoraId)
+    VALUES ('Francia', 'FR', (SELECT monedaId FROM monedas WHERE codigoISO = 'EUR'), p_actualizado_por, p_computadora_id)
+    ON CONFLICT DO NOTHING;
 
-    INSERT INTO ciudades (provinciaEstadoId, nombre, actualizadoPor, computadoraId)
-    VALUES (v_prov_id, 'Bluefields', p_actualizado_por, p_computadora_id) RETURNING ciudadId INTO v_ciu_id;
-
-    INSERT INTO direcciones (ciudadId, detalles, actualizadoPor, computadoraId)
-    VALUES (v_ciu_id, 'Puerto de Bluefields, Zona Franca Etheria', p_actualizado_por, p_computadora_id);
-
-    -- (Repetir lógica similar para los otros 4 países: Costa Rica, Marruecos, India, Francia)
-    -- Aquí se insertarían los datos restantes para cumplir con los 5 países solicitados...
-
-    CALL sp_registrar_log(p_actualizado_por, 1, 'Geografía de 5 países cargada con éxito', 1, 4, 4, v_pais_id::BIGINT);
+    CALL sp_registrar_log(p_actualizado_por, 1, 'Geografía básica cargada exitosamente', 1, 4, 4, NULL);
 
 EXCEPTION WHEN OTHERS THEN
-    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en ubicaciones lógicas: ' || SQLERRM, 1, 2, NULL, NULL);
-    RAISE EXCEPTION 'Fallo en geografía: %', SQLERRM;
+    -- El log aquí solo funcionará si el SP es llamado fuera de una transacción atómica mayor
+    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en geografía: ' || SQLERRM, 1, 2, NULL, NULL);
+    RAISE EXCEPTION 'Error crítico en ubicaciones: %', SQLERRM;
 END;
 $$;
 
@@ -259,21 +248,45 @@ CREATE OR REPLACE PROCEDURE sp_registrar_personas_sistema(
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- Administrador Principal
+    -- 1. Administrador Principal
+    -- Si sp_insertar_persona falla, lanzará una excepción y saltará directamente al bloque EXCEPTION
     CALL sp_insertar_persona('0-000-000', 'Admin', 'Etheria', 'System', 'admin@etheria.com', '50500000000', p_actualizado_por, p_computadora_id);
 
-    -- Operarios del HUB (Nicaragua)
+    -- 2. Operarios del HUB (Nicaragua)
     CALL sp_insertar_persona('NI-101', 'Juan', 'Pérez', 'López', 'jperez@etheria.com', '5058888888', p_actualizado_por, p_computadora_id);
     CALL sp_insertar_persona('NI-102', 'María', 'García', NULL, 'mgarcia@etheria.com', '5057777777', p_actualizado_por, p_computadora_id);
 
-    -- Contactos Legales de Proveedores Internacionales
+    -- 3. Contactos Legales de Proveedores Internacionales
     CALL sp_insertar_persona('FR-990', 'Jean', 'Dupont', NULL, 'j.dupont@frenchlab.com', '3312345678', p_actualizado_por, p_computadora_id);
 
-    CALL sp_registrar_log(p_actualizado_por, 1, 'Roles de personas (Admins, Operarios, Legales) registrados', 1, 4, 1, NULL);
+    -- 4. LOG DE ÉXITO FINAL
+    -- Solo se llega aquí si TODAS las llamadas anteriores terminaron sin errores.
+    CALL sp_registrar_log(
+        p_actualizado_por, 
+        1, 
+        'Carga masiva de personas del sistema finalizada con éxito total', 
+        1, 
+        4, 
+        1, -- dataObjectId para Personas
+        NULL
+    );
 
 EXCEPTION WHEN OTHERS THEN
-    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en carga de personas: ' || SQLERRM, 1, 2, NULL, NULL);
-    RAISE EXCEPTION 'Fallo en catálogo de personas: %', SQLERRM;
+    -- 5. MANEJO DE ERROR GLOBAL
+    -- Si cualquiera de los CALL falla, capturamos el error aquí.
+    -- Esto evita que se registre el log de éxito erróneamente.
+    CALL sp_registrar_log(
+        p_actualizado_por, 
+        2, 
+        'Fallo parcial o total en carga de personas: ' || SQLERRM, 
+        1, 
+        2, 
+        NULL, 
+        NULL
+    );
+    
+    -- Re-lanzamos la excepción para que el orquestador sepa que este módulo falló
+    RAISE EXCEPTION 'Error en catálogo de personas (Consistencia): %', SQLERRM;
 END;
 $$;
 
@@ -349,10 +362,52 @@ $$;
 
 3. SP Insertar Producto Base: -- Este procedimiento registra el producto "desnudo" (sin marca), tal cual llega al HUB de Nicaragua.
 
+-- 1. Registrar Proveedor con Nombre de Persona (en lugar de ID)
+CREATE OR REPLACE PROCEDURE sp_registrar_proveedor_internacional(
+    p_cedula_juridica VARCHAR,
+    p_nombre_comercial VARCHAR,
+    p_direccion_id INT, -- Las direcciones suelen ser únicas/dinámicas, se mantiene ID o detalle
+    p_telefono VARCHAR,
+    p_cedula_contacto VARCHAR, -- Usamos Cédula para buscar a la persona
+    p_rol_legal VARCHAR,
+    p_actualizado_por INT,
+    p_computadora_id INT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_proveedor_id INT;
+    v_persona_id INT;
+BEGIN
+    -- Buscar a la persona por su cédula
+    SELECT personaId INTO v_persona_id FROM personas WHERE cedulaIdentidad = p_cedula_contacto;
+    
+    IF v_persona_id IS NULL THEN
+        RAISE EXCEPTION 'La persona con cédula % no existe en el catálogo.', p_cedula_contacto;
+    END IF;
+
+    INSERT INTO proveedores (cedulaJuridica, nombreComercial, direccionId, telefonoOficina, actualizadoPor, computadoraId)
+    VALUES (p_cedula_juridica, p_nombre_comercial, p_direccion_id, p_telefono, p_actualizado_por, p_computadora_id)
+    ON CONFLICT (cedulaJuridica) DO UPDATE SET nombreComercial = EXCLUDED.nombreComercial
+    RETURNING proveedorId INTO v_proveedor_id;
+
+    INSERT INTO proveedoresContactosLegales (proveedorId, personaId, rol, actualizadoPor, computadoraId)
+    VALUES (v_proveedor_id, v_persona_id, p_rol_legal, p_actualizado_por, p_computadora_id)
+    ON CONFLICT (proveedorId, personaId) DO NOTHING;
+
+    CALL sp_registrar_log(p_actualizado_por, 1, 'Proveedor registrado: ' || p_nombre_comercial, 1, 4, 8, v_proveedor_id::BIGINT);
+
+EXCEPTION WHEN OTHERS THEN
+    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en proveedor: ' || SQLERRM, 1, 2, NULL, NULL);
+    RAISE EXCEPTION 'Fallo en sp_registrar_proveedor_internacional: %', SQLERRM;
+END;
+$$;
+
+-- 2. Insertar Producto por Nombres de Categoría y Unidad
 CREATE OR REPLACE PROCEDURE sp_insertar_producto_base(
     p_nombre VARCHAR,
-    p_categoria_id INT,
-    p_unidad_medida_id INT,
+    p_nombre_categoria VARCHAR, -- Nombre en lugar de ID
+    p_nombre_unidad VARCHAR,    -- Nombre en lugar de ID
     p_descripcion_tecnica VARCHAR,
     p_actualizado_por INT,
     p_computadora_id INT
@@ -361,15 +416,24 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_prod_id INT;
+    v_cat_id INT;
+    v_uni_id INT;
 BEGIN
+    SELECT categoriaId INTO v_cat_id FROM categoriasBase WHERE nombre = p_nombre_categoria;
+    SELECT unidadMedidaId INTO v_uni_id FROM unidadesMedida WHERE nombre = p_nombre_unidad;
+
+    IF v_cat_id IS NULL OR v_uni_id IS NULL THEN
+        RAISE EXCEPTION 'Categoría (%) o Unidad (%) no encontradas.', p_nombre_categoria, p_nombre_unidad;
+    END IF;
+
     INSERT INTO productosBase (nombre, categoriaId, unidadMedidaId, descripcionTecnica, actualizadoPor, computadoraId)
-    VALUES (p_nombre, p_categoria_id, p_unidad_medida_id, p_descripcion_tecnica, p_actualizado_por, p_computadora_id)
+    VALUES (p_nombre, v_cat_id, v_uni_id, p_descripcion_tecnica, p_actualizado_por, p_computadora_id)
     RETURNING productoBaseId INTO v_prod_id;
 
     CALL sp_registrar_log(p_actualizado_por, 1, 'Producto base registrado: ' || p_nombre, 1, 4, 12, v_prod_id::BIGINT);
 
 EXCEPTION WHEN OTHERS THEN
-    CALL sp_registrar_log(p_actualizado_por, 2, 'Error al insertar producto: ' || SQLERRM, 1, 2, NULL, NULL);
+    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en producto base: ' || SQLERRM, 1, 2, NULL, NULL);
     RAISE EXCEPTION 'Fallo en sp_insertar_producto_base: %', SQLERRM;
 END;
 $$;
@@ -382,14 +446,16 @@ $$;
 
 1. SP Generar Flujo Compras: --Este procedimiento es una "macro-transacción". Simula todo el proceso administrativo desde que se contacta al proveedor hasta que se pagan los impuestos de importación (DUA).
 
+-- 1. Generar Compra buscando por Nombres
 CREATE OR REPLACE PROCEDURE sp_generar_flujo_compras(
-    p_proveedor_id INT,
-    p_producto_id INT,
+    p_nombre_proveedor VARCHAR,
+    p_nombre_producto VARCHAR,
     p_cantidad NUMERIC,
     p_precio_unitario_origen NUMERIC,
-    p_iso_moneda VARCHAR, -- Ej: 'EUR'
-    p_tipo_cambio_usd NUMERIC,
-    p_costo_dua NUMERIC, -- Impuesto de aduana
+    p_iso_moneda VARCHAR,
+    p_tipo_cambio_usd NUMERIC, -- Este es el valor que se guardará en tipoCambio
+    p_costo_dua NUMERIC,
+    p_numero_documento VARCHAR, -- Nuevo parámetro necesario
     p_actualizado_por INT,
     p_computadora_id INT
 )
@@ -397,27 +463,44 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_oc_id INT;
+    v_prov_id INT;
+    v_prod_id INT;
     v_moneda_id INT;
+    v_monto_calculado NUMERIC(15,2);
 BEGIN
+    SELECT proveedorId INTO v_prov_id FROM proveedores WHERE nombreComercial = p_nombre_proveedor;
+    SELECT productoBaseId INTO v_prod_id FROM productosBase WHERE nombre = p_nombre_producto;
     SELECT monedaId INTO v_moneda_id FROM monedas WHERE codigoISO = p_iso_moneda;
 
-    -- 1. Crear Cabecera de Orden de Compra
-    INSERT INTO ordenesCompra (proveedorId, estado, monedaCompraId, tipoCambioAUSD, fechaEmision, actualizadoPor, computadoraId)
-    VALUES (p_proveedor_id, 'En Transito', v_moneda_id, p_tipo_cambio_usd, NOW(), p_actualizado_por, p_computadora_id)
+    IF v_prov_id IS NULL OR v_prod_id IS NULL THEN
+        RAISE EXCEPTION 'Proveedor (%) o Producto (%) inexistente.', p_nombre_proveedor, p_nombre_producto;
+    END IF;
+
+    -- CORRECCIÓN: tipoCambioAUSD -> tipoCambio
+    INSERT INTO ordenesCompra (proveedorId, estado, monedaCompraId, tipoCambio, fechaEmision, actualizadoPor, computadoraId)
+    VALUES (v_prov_id, 'En Transito', v_moneda_id, p_tipo_cambio_usd, NOW(), p_actualizado_por, p_computadora_id)
     RETURNING ordenCompraId INTO v_oc_id;
 
-    -- 2. Crear Detalle de la Orden
     INSERT INTO ordenesCompraDetalle (ordenCompraId, productoBaseId, cantidadPedida, precioUnitarioMonedaOrigen, actualizadoPor, computadoraId)
-    VALUES (v_oc_id, p_producto_id, p_cantidad, p_precio_unitario_origen, p_actualizado_por, p_computadora_id);
+    VALUES (v_oc_id, v_prod_id, p_cantidad, p_precio_unitario_origen, p_actualizado_por, p_computadora_id);
 
-    -- 3. Registrar el costo de importación (DUA)
-    INSERT INTO transaccionesCostos (ordenCompraId, tipoCostoId, monedaOriginalId, montoOriginal, montoUSD, actualizadoPor, computadoraId)
-    VALUES (v_oc_id, 1, v_moneda_id, p_costo_dua, (p_costo_dua / p_tipo_cambio_usd), p_actualizado_por, p_computadora_id);
+    -- CORRECCIÓN: montoUSD -> montoCalculado y adición de tipoCambio y numeroDocumento
+    -- Suponiendo que montoCalculado es (montoOriginal * tipoCambio) o (montoOriginal / tipoCambio) según tu lógica de negocio
+    v_monto_calculado := (p_costo_dua / p_tipo_cambio_usd); 
 
-    CALL sp_registrar_log(p_actualizado_por, 1, 'Flujo de compra generado OC: ' || v_oc_id, 1, 4, 13, v_oc_id::BIGINT);
+    INSERT INTO transaccionesCostos (
+        ordenCompraId, tipoCostoId, monedaOriginalId, montoOriginal, 
+        tipoCambio, montoCalculado, numeroDocumento, actualizadoPor, computadoraId
+    )
+    VALUES (
+        v_oc_id, 1, v_moneda_id, p_costo_dua, 
+        p_tipo_cambio_usd, v_monto_calculado, p_numero_documento, p_actualizado_por, p_computadora_id
+    );
+
+    CALL sp_registrar_log(p_actualizado_por, 1, 'Flujo OC generado para ' || p_nombre_proveedor, 1, 4, 13, v_oc_id::BIGINT);
 
 EXCEPTION WHEN OTHERS THEN
-    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en flujo de compras: ' || SQLERRM, 1, 2, NULL, NULL);
+    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en flujo compras: ' || SQLERRM, 1, 2, NULL, NULL);
     RAISE EXCEPTION 'Fallo en sp_generar_flujo_compras: %', SQLERRM;
 END;
 $$;
@@ -490,15 +573,21 @@ DECLARE
     v_marca_id INT;
 BEGIN
     SELECT paisId INTO v_pais_id FROM paises WHERE codigoISO = p_iso_pais_sede;
+    
+    IF v_pais_id IS NULL THEN
+        RAISE EXCEPTION 'El país con ISO % no existe.', p_iso_pais_sede;
+    END IF;
 
     INSERT INTO marcasBlancas (nombreMarca, logotipoUrl, paisSedeId, actualizadoPor, computadoraId)
     VALUES (p_nombre_marca, p_url_logotipo, v_pais_id, p_actualizado_por, p_computadora_id)
-    ON CONFLICT (nombreMarca) DO NOTHING
+    ON CONFLICT (nombreMarca) DO UPDATE SET logotipoUrl = EXCLUDED.logotipoUrl
     RETURNING marcaId INTO v_marca_id;
 
-    IF v_marca_id IS NOT NULL THEN
-        CALL sp_registrar_log(p_actualizado_por, 1, 'Marca Blanca/Sitio Web configurado: ' || p_nombre_marca, 1, 4, 19, v_marca_id::BIGINT);
-    END IF;
+    CALL sp_registrar_log(p_actualizado_por, 1, 'Marca Blanca configurada: ' || p_nombre_marca, 1, 4, 19, v_marca_id::BIGINT);
+
+EXCEPTION WHEN OTHERS THEN
+    CALL sp_registrar_log(p_actualizado_por, 2, 'Error en Marca Blanca: ' || SQLERRM, 1, 2, NULL, NULL);
+    RAISE EXCEPTION 'Fallo en configuración de marca: %', SQLERRM;
 END;
 $$;
 
@@ -518,52 +607,118 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_pais_id INT;
+    v_requisito_id INT;
 BEGIN
-    SELECT paisId INTO v_pais_id FROM paises WHERE codigoISO = p_iso_pais_destino;
+    -- 1. Validar existencia del País
+    SELECT paisId INTO v_pais_id 
+    FROM paises 
+    WHERE codigoISO = p_iso_pais_destino;
 
-    INSERT INTO requisitosLegalesPais (tipoRequisitoId, productoBaseId, paisDestinoId, nombreRequisito, urlDocumentoLegal, actualizadoPor, computadoraId)
-    VALUES (p_tipo_requisito_id, p_producto_id, v_pais_id, p_nombre_documento, p_url_doc, p_actualizado_por, p_computadora_id);
+    IF v_pais_id IS NULL THEN
+        RAISE EXCEPTION 'El país de destino con ISO % no existe en el sistema.', p_iso_pais_destino;
+    END IF;
 
-    CALL sp_registrar_log(p_actualizado_por, 1, 'Requisito legal registrado para exportación', 1, 4, 18, NULL);
+    -- 2. Validar existencia del Producto
+    IF NOT EXISTS (SELECT 1 FROM productosBase WHERE productoBaseId = p_producto_id) THEN
+        RAISE EXCEPTION 'El producto con ID % no existe.', p_producto_id;
+    END IF;
+
+    -- 3. Insertar el requisito legal
+    INSERT INTO requisitosLegalesPais (
+        tipoRequisitoId, 
+        productoBaseId, 
+        paisDestinoId, 
+        nombreRequisito, 
+        urlDocumentoLegal, 
+        actualizadoPor, 
+        computadoraId
+    )
+    VALUES (
+        p_tipo_requisito_id, 
+        p_producto_id, 
+        v_pais_id, 
+        p_nombre_documento, 
+        p_url_doc, 
+        p_actualizado_por, 
+        p_computadora_id
+    )
+    ON CONFLICT (productoBaseId, paisDestinoId, nombreRequisito) 
+    DO UPDATE SET urlDocumentoLegal = EXCLUDED.urlDocumentoLegal,
+                  actualizadoPor = EXCLUDED.actualizadoPor,
+                  fechaRegistro = NOW()
+    RETURNING requisitoId INTO v_requisito_id;
+
+    -- 4. Registro en Log de Auditoría (Éxito)
+    CALL sp_registrar_log(
+        p_actualizado_por, 
+        1, 
+        'Requisito legal registrado: ' || p_nombre_documento || ' para país ' || p_iso_pais_destino, 
+        1, 
+        4, 
+        18, -- dataObjectId para Requisitos Legales
+        v_requisito_id::BIGINT
+    );
+
+EXCEPTION WHEN OTHERS THEN
+    -- Registro en Log de Auditoría (Error)
+    CALL sp_registrar_log(
+        p_actualizado_por, 
+        2, 
+        'Error al registrar requisito legal: ' || SQLERRM, 
+        1, 
+        2, 
+        NULL, 
+        NULL
+    );
+    RAISE EXCEPTION 'Fallo en sp_registrar_requisito_legal: %', SQLERRM;
 END;
 $$;
 
 3. SP Procesar Despacho Trazabilidad: --Este es el SP que genera la "salida" del inventario.
 
 CREATE OR REPLACE PROCEDURE sp_procesar_despacho_trazabilidad(
-    p_inventario_id INT,
+    p_lote_codigo VARCHAR,     -- Buscamos por código de lote
     p_cantidad NUMERIC,
-    p_marca_id INT, -- El sitio web de Dynamic Brands
+    p_nombre_marca VARCHAR,    -- Buscamos por nombre de marca blanca
     p_iso_destino VARCHAR,
-    p_orden_externa_id INT, -- El ID que viene del otro sistema (MySQL)
-    p_operario_id INT,
+    p_orden_externa_id INT,
+    p_operario_cedula VARCHAR, -- Buscamos al operario por cédula
     p_computadora_id INT
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    v_inv_id INT;
+    v_marca_id INT;
+    v_ope_id INT;
     v_mov_id UUID;
 BEGIN
-    -- 1. Registrar el movimiento de salida
+    SELECT i.inventarioId INTO v_inv_id FROM inventarioHub i JOIN lotesImportacion l ON i.loteId = l.loteId WHERE l.codigoLote = p_lote_codigo;
+    SELECT marcaId INTO v_marca_id FROM marcasBlancas WHERE nombreMarca = p_nombre_marca;
+    SELECT personaId INTO v_ope_id FROM personas WHERE cedulaIdentidad = p_operario_cedula;
+
+    IF v_inv_id IS NULL OR v_marca_id IS NULL THEN
+        RAISE EXCEPTION 'Lote (%) o Marca (%) no válidos.', p_lote_codigo, p_nombre_marca;
+    END IF;
+
     INSERT INTO trazabilidadMovimientos (
         inventarioId, ordenIdExterna, marcaId, paisDestinoId, 
         tipoMovimiento, cantidad, operarioId, fechaRegistro, actualizadoPor, computadoraId
     ) VALUES (
-        p_inventario_id, p_orden_externa_id, p_marca_id, 
+        v_inv_id, p_orden_externa_id, v_marca_id, 
         (SELECT paisId FROM paises WHERE codigoISO = p_iso_destino),
-        'Despacho Internacional', p_cantidad, p_operario_id, NOW(), p_operario_id, p_computadora_id
+        'Despacho Internacional', p_cantidad, v_ope_id, NOW(), v_ope_id, p_computadora_id
     ) RETURNING movimientoId INTO v_mov_id;
 
-    -- 2. Actualizar el inventario físico (descontar)
-    UPDATE inventarioHub 
-    SET cantidadDisponible = cantidadDisponible - p_cantidad,
-        versionLock = versionLock + 1
-    WHERE inventarioId = p_inventario_id;
+    UPDATE inventarioHub SET cantidadDisponible = cantidadDisponible - p_cantidad WHERE inventarioId = v_inv_id;
 
-    CALL sp_registrar_log(p_operario_id, 1, 'Despacho procesado. Movimiento: ' || v_mov_id, 1, 4, 21, NULL);
+    CALL sp_registrar_log(v_ope_id, 1, 'Despacho exitoso de ' || p_lote_codigo, 1, 4, 21, NULL);
+
+EXCEPTION WHEN OTHERS THEN
+    CALL sp_registrar_log(1, 2, 'Error en despacho: ' || SQLERRM, 1, 2, NULL, NULL);
+    RAISE EXCEPTION 'Fallo en despacho: %', SQLERRM;
 END;
 $$;
-
 
 /* ======================================================
    Módulo 6: Orquestador Maestro
@@ -574,35 +729,109 @@ $$;
 CREATE OR REPLACE PROCEDURE sp_orquestar_llenado_etheria()
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_admin_id INT := 1; -- ID esperado tras la primera inserción
+    v_pc_id INT := 1;
+    v_i INT;
 BEGIN
-    -- 1. Iniciar Log de proceso
-    CALL sp_registrar_log(1, 1, 'Iniciando orquestación de datos de prueba', 1, 1, NULL, NULL);
+    -- ======================================================
+    -- 1. FASE INICIAL: IDENTIDAD Y AUDITORÍA
+    -- ======================================================
+    -- Primero creamos las personas para tener un 'p_actualizado_por' válido
+    CALL sp_registrar_personas_sistema(v_admin_id, v_pc_id); 
+    
+    -- Log de inicio (Severidad 1: Informativo)
+    CALL sp_registrar_log(v_admin_id, 1, 'INICIO DE ORQUESTACIÓN GLOBAL: Cargando catálogos maestros', 1, 1, NULL, NULL);
 
-    -- 2. Cargar Infraestructura (Monedas, Unidades)
-    CALL sp_registrar_infraestructura_base();
+    -- ======================================================
+    -- 2. FASE DE INFRAESTRUCTURA (Geografía y Monedas)
+    -- ======================================================
+    CALL sp_registrar_infraestructura_base(v_admin_id, v_pc_id);
+    CALL sp_registrar_ubicaciones_logicas(v_admin_id, v_pc_id);
 
-    -- 3. Cargar Geografía (5 Países)
-    CALL sp_registrar_ubicaciones_logicas();
+    -- ======================================================
+    -- 3. FASE DE SOURCING (Proveedores y Categorías)
+    -- ======================================================
+    CALL sp_crear_categoria_base('Aceites Esenciales', 'Extractos botánicos puros', v_admin_id, v_pc_id);
+    CALL sp_crear_categoria_base('Ungüentos', 'Preparaciones para uso tópico', v_admin_id, v_pc_id);
+    
+    -- Registrar proveedor (Se asocia a la persona FR-990 creada en sp_registrar_personas_sistema)
+    CALL sp_registrar_proveedor_internacional(
+        'FR-888-J', 'French Lab SARL', 1, '+33 1 23 45 67', 'FR-990', 'Representante Legal', v_admin_id, v_pc_id
+    );
 
-    -- 4. Cargar Catálogo (100 Productos)
-    -- Aquí se puede usar un loop para generar variaciones de nombres
-    CALL sp_cargar_catalogo_productos();
+    -- ======================================================
+    -- 4. FASE DE PRODUCTOS (Carga Masiva)
+    -- ======================================================
+    FOR v_i IN 1..5 LOOP
+        CALL sp_insertar_producto_base(
+            'Aceite de Lavanda v' || v_i, 
+            'Aceites Esenciales', 
+            'Litros', 
+            'Pureza grado medicinal 99.' || v_i || '%', 
+            v_admin_id, 
+            v_pc_id
+        );
+    END LOOP;
 
-    -- 5. Configurar Marcas (9 Sitios Web)
-    CALL sp_configurar_marcas_dinamicas();
+    -- ======================================================
+    -- 5. FASE OPERATIVA (Compras e Inventario HUB)
+    -- ======================================================
+    -- Generar flujo de compra
+    CALL sp_generar_flujo_compras(
+        'French Lab SARL', 
+        'Aceite de Lavanda v1', 
+        500.00,        -- Cantidad
+        12.50,         -- Precio Origen (EUR)
+        'EUR',         -- ISO Moneda
+        1.08,          -- Tipo de Cambio a USD
+        1500.00,       -- Costo DUA/Impuestos
+        'FACT-2024-001', 
+        v_admin_id, 
+        v_pc_id
+    );
 
-    -- 6. Generar Movimientos (Compras e Inventario)
-    CALL sp_generar_flujo_compras();
-    CALL sp_ingresar_inventario_hub();
+    -- Ingresar al Inventario (Asumimos detalle OC ID 1 por ser la primera)
+    CALL sp_ingresar_inventario_hub(
+        1, 'LOTE-FR-LAV-001', (CURRENT_DATE + INTERVAL '2 years')::DATE, 
+        'PASILLO-A', 'ESTANTE-01', 'NIVEL-3', 500.00, v_admin_id, v_pc_id
+    );
 
-    CALL sp_registrar_log(1, 1, 'Finalización exitosa de carga masiva', 1, 1, NULL, NULL);
+    -- ======================================================
+    -- 6. FASE DE SALIDA (Marcas Blancas y Despacho)
+    -- ======================================================
+    -- Configurar los sitios web (Marcas)
+    CALL sp_configurar_marca_blanca('BioCura Global', 'https://biocura.com/logo.png', 'FR', v_admin_id, v_pc_id);
+    CALL sp_configurar_marca_blanca('Etheria Wellness', 'https://etheria.com/logo.png', 'NI', v_admin_id, v_pc_id);
+
+    -- Simular despacho de trazabilidad (Salida de inventario)
+    -- El operario NI-101 (Juan Pérez) realiza el despacho
+    CALL sp_procesar_despacho_trazabilidad(
+        'LOTE-FR-LAV-001', 
+        50.00, 
+        'BioCura Global', 
+        'FR', 
+        9999,          -- ID de orden externa del sitio web
+        'NI-101',      -- Cédula del operario
+        v_pc_id
+    );
+
+    -- ======================================================
+    -- 7. CIERRE DE PROCESO
+    -- ======================================================
+    CALL sp_registrar_log(v_admin_id, 1, 'PROCESO DE LLENADO COMPLETADO: Todos los módulos sincronizados', 1, 1, NULL, NULL);
 
 EXCEPTION WHEN OTHERS THEN
-    -- Registro de error en auditoría antes de fallar
-    CALL sp_registrar_log(1, 2, 'ERROR CRÍTICO: ' || SQLERRM, 1, 3, NULL, NULL);
-    RAISE EXCEPTION 'Error en la orquestación: %', SQLERRM;
+    -- Registro de fallo crítico en el Orquestador
+    CALL sp_registrar_log(
+        v_admin_id, 
+        2, 
+        'FALLO CRÍTICO EN ORQUESTADOR: ' || SQLERRM || ' en el estado: ' || SQLSTATE, 
+        1, 
+        2, 
+        NULL, 
+        NULL
+    );
+    RAISE EXCEPTION 'La orquestación de Etheria ha fallado. Revisar tabla de logs para más detalle. Error: %', SQLERRM;
 END;
 $$;
-
-
-

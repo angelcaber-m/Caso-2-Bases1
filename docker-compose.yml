@@ -61,6 +61,6 @@ services:
         condition: service_healthy
       postgres_central:
         condition: service_healthy
-      mysql:
+      mysql_dynamic:
         condition: service_healthy
     command: ["python", "procesoETL.py"]

@@ -13,10 +13,10 @@ services:
     volumes:
       - ./Scripts/Etheria Global:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d EtheriaGlobal"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   postgres_central:
     image: postgres:17-alpine
@@ -31,10 +31,10 @@ services:
     volumes:
       - ./ETL/Scripts:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d RepositorioCentralCaso2"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   mysql:
     image: mysql:8.4
@@ -48,10 +48,10 @@ services:
     volumes:
       - ./Scripts/Dynamic Brands:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p123456"]
+      test: ["CMD-SHELL", "mysql -u root -p123456 -e 'SELECT 1' DynamicBrands"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   etl:
     build: ./ETL

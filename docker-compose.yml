@@ -48,10 +48,11 @@ services:
     volumes:
       - ./Scripts/Dynamic Brands:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "mysql -u root -p123456 -e 'SELECT 1 FROM information_schema.tables LIMIT 1' DynamicBrands"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p123456"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 30s
 
   etl:
     build: ./ETL

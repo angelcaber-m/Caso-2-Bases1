@@ -48,7 +48,7 @@ services:
     volumes:
       - ./Scripts/Dynamic Brands:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "mysql -u root -p123456 -e 'SELECT 1' DynamicBrands"]
+      test: ["CMD-SHELL", "mysql -u root -p123456 -e 'SELECT 1 FROM information_schema.tables LIMIT 1' DynamicBrands"]
       interval: 5s
       timeout: 5s
       retries: 10

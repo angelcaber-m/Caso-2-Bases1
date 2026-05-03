@@ -283,7 +283,7 @@ BEGIN
     -- Generar correo dinámico para evitar el error de UNIQUE
     SET v_correo = LOWER(CONCAT(p_nombre, '.', p_apellido1, '@mail.com'));
 
-    INSERT INTO clientes (nombre, primerApellido, segundoApellido, correo, telefono, contraseña) 
+    INSERT INTO clientes (nombre, primerApellido, segundoApellido, correo, telefono, contrasena) 
     VALUES (p_nombre, p_apellido1, p_apellido2, v_correo, p_telefono, AES_ENCRYPT('Password123!', 'key_secreta'));
 
     CALL sp_registrar_log(CONCAT('Cliente registrado: ', p_nombre, ' ', p_apellido1), 'Paso Completado', 'Info', 'Sistema Llenado');

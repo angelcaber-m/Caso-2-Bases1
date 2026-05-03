@@ -5,18 +5,27 @@ import time
 
 # --- CONFIG ESPERA DE BASES DE DATOS ---
 MAX_RETRIES = 20
+MAX_RETRIES_MYSQL = 40
 RETRY_DELAY = 5  # segundos
 
+# --- CONEXIONES ---
+engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
+    
+engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql_dynamic:3306/DynamicBrands')
+    
+engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
+
+
 # --- FUNCIÓN DE ESPERA ---
-def wait_for_connection(engine, name, test_query="SELECT 1"):
-    for i in range(MAX_RETRIES):
+def wait_for_connection(engine, name, test_query="SELECT 1", max_retries=MAX_RETRIES):
+    for i in range(max_retries):
         try:
             with engine.connect() as conn:
                 conn.execute(text(test_query))
             print(f"✅ Conexión lista: {name}")
             return
         except Exception:
-            print(f"⏳ Esperando conexión a {name}... ({i+1}/{MAX_RETRIES})")
+            print(f"⏳ Esperando conexión a {name}... ({i+1}/{max_retries})")
             time.sleep(RETRY_DELAY)
     raise Exception(f"No se pudo conectar a {name}")
 
@@ -34,18 +43,16 @@ def limpiar_repositorio():
 def run_full_etl():
     print(f"[{datetime.datetime.now()}] Iniciando ETL...")
 
-    # --- CONEXIONES ---
-    engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
-    
-    engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql_dynamic:3306/DynamicBrands')
-    
-    engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
-
     try:
         # Se espera a que se hayan conectado las bases
         wait_for_connection(engine_dw, "RepositorioCentralCaso2")
         wait_for_connection(engine_etheria, "EtheriaGlobal")
-        wait_for_connection(engine_dynamic, "DynamicBrands", test_query="SELECT 1 FROM information_schema.tables LIMIT 1")
+        wait_for_connection(
+            engine_dynamic, 
+            "DynamicBrands", 
+            test_query="SELECT 1 FROM information_schema.tables LIMIT 1",
+            max_retries=MAX_RETRIES_MYSQL 
+        )
         
         
         limpiar_repositorio()

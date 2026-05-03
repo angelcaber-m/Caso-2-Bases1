@@ -4,13 +4,13 @@ import datetime
 import time
 
 # --- CONFIG ESPERA DE BASES DE DATOS ---
-MAX_RETRIES = 10
+MAX_RETRIES = 30
 RETRY_DELAY = 5  # segundos
 
 # --- CONEXIONES ---
 engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
 
-engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql:3306/DynamicBrands')
+engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql_dynamic:3306/DynamicBrands')
 
 engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
 

@@ -1,6 +1,11 @@
 import pandas as pd
 from sqlalchemy import create_engine, text
 import datetime
+import time
+
+# --- CONFIG ESPERA DE BASES DE DATOS ---
+MAX_RETRIES = 10
+RETRY_DELAY = 5  # segundos
 
 # --- CONEXIONES ---
 engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
@@ -8,6 +13,20 @@ engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_e
 engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql:3306/DynamicBrands')
 
 engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
+
+# --- FUNCIÓN DE ESPERA ---
+def wait_for_connection(engine, name):
+    for i in range(MAX_RETRIES):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            print(f"✅ Conexión lista: {name}")
+            return
+        except Exception:
+            print(f"⏳ Esperando conexión a {name}... ({i+1}/{MAX_RETRIES})")
+            time.sleep(RETRY_DELAY)
+    raise Exception(f"No se pudo conectar a {name}")
+
 
 
 def limpiar_repositorio():
@@ -23,6 +42,11 @@ def run_full_etl():
     print(f"[{datetime.datetime.now()}] Iniciando ETL...")
 
     try:
+        # Se espera a que se hayan conectado las bases
+        wait_for_connection(engine_etheria, "EtheriaGlobal")
+        wait_for_connection(engine_dynamic, "DynamicBrands")
+        wait_for_connection(engine_dw, "RepositorioCentralCaso2")
+        
         limpiar_repositorio()
 
         # =============================

@@ -30,7 +30,7 @@ docker-compose up --build
 2. Abrir el archivo "Dashboard Caso 2.pbix" con Power BI Desktop.
    
 3. Conectarse a la base de datos PostgreSQL:
-    - Servidor: localhost:5432
+    - Servidor: localhost:5433
     - Base de datos: RepositorioCentralCaso2
     - Usuario: postgres
     - Contraseña: 123456

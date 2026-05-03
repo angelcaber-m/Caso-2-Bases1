@@ -111,7 +111,7 @@ CREATE TABLE tiposDeDatosAtributos (
 CREATE TABLE unidadesDeMedida (
     unidadDeMedidaId INT AUTO_INCREMENT PRIMARY KEY,
     medida VARCHAR(30),
-    abreviación VARCHAR(10),
+    abreviacion VARCHAR(10),
     fechaCreacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fechaActualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     actualizadoPor INT,
@@ -253,7 +253,7 @@ CREATE TABLE clientes (
     segundoApellido VARCHAR(50),
     correo VARCHAR(100) UNIQUE,
     telefono VARCHAR(20),
-    contraseña VARBINARY(255),
+    contrasena VARBINARY(255),
     fechaDeRegistro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fechaActualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT 1,

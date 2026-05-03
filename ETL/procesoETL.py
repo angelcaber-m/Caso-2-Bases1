@@ -3,9 +3,11 @@ from sqlalchemy import create_engine, text
 import datetime
 
 # --- CONEXIONES ---
-engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@localhost:5432/EtheriaGlobal')
-engine_dynamic = create_engine('mysql+pymysql://root:123456@localhost:3306/DynamicBrands')
-engine_dw      = create_engine('postgresql+psycopg2://postgres:123456@localhost:5432/RepositorioCentralCaso2')
+engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
+
+engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql:3306/DynamicBrands')
+
+engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
 
 
 def limpiar_repositorio():

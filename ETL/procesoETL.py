@@ -4,15 +4,8 @@ import datetime
 import time
 
 # --- CONFIG ESPERA DE BASES DE DATOS ---
-MAX_RETRIES = 40
+MAX_RETRIES = 20
 RETRY_DELAY = 5  # segundos
-
-# --- CONEXIONES ---
-engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
-
-engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql_dynamic:3306/DynamicBrands')
-
-engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
 
 # --- FUNCIÓN DE ESPERA ---
 def wait_for_connection(engine, name, test_query="SELECT 1"):
@@ -40,6 +33,13 @@ def limpiar_repositorio():
 
 def run_full_etl():
     print(f"[{datetime.datetime.now()}] Iniciando ETL...")
+
+    # --- CONEXIONES ---
+    engine_etheria = create_engine('postgresql+psycopg2://postgres:123456@postgres_etheria:5432/EtheriaGlobal')
+    
+    engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql_dynamic:3306/DynamicBrands')
+    
+    engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
 
     try:
         # Se espera a que se hayan conectado las bases

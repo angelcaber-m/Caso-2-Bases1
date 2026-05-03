@@ -4,7 +4,7 @@ import datetime
 import time
 
 # --- CONFIG ESPERA DE BASES DE DATOS ---
-MAX_RETRIES = 30
+MAX_RETRIES = 40
 RETRY_DELAY = 5  # segundos
 
 # --- CONEXIONES ---
@@ -15,11 +15,11 @@ engine_dynamic = create_engine('mysql+pymysql://root:123456@mysql_dynamic:3306/D
 engine_dw = create_engine('postgresql+psycopg2://postgres:123456@postgres_central:5432/RepositorioCentralCaso2')
 
 # --- FUNCIÓN DE ESPERA ---
-def wait_for_connection(engine, name):
+def wait_for_connection(engine, name, test_query="SELECT 1"):
     for i in range(MAX_RETRIES):
         try:
             with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
+                conn.execute(text(test_query))
             print(f"✅ Conexión lista: {name}")
             return
         except Exception:
@@ -43,9 +43,10 @@ def run_full_etl():
 
     try:
         # Se espera a que se hayan conectado las bases
-        wait_for_connection(engine_etheria, "EtheriaGlobal")
-        wait_for_connection(engine_dynamic, "DynamicBrands")
         wait_for_connection(engine_dw, "RepositorioCentralCaso2")
+        wait_for_connection(engine_etheria, "EtheriaGlobal")
+        wait_for_connection(engine_dynamic, "DynamicBrands", test_query="SELECT 1 FROM information_schema.tables LIMIT 1")
+        
         
         limpiar_repositorio()
 

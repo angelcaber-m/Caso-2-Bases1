@@ -28,5 +28,4 @@ BEGIN
         fecha_actual := fecha_actual + INTERVAL '1 day';
     END LOOP;
     
-    RAISE NOTICE 'Dimensión Tiempo cargada exitosamente para el año 2026';
 END $$;

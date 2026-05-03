@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+
+  postgres_etheria:
+    image: postgres:17-alpine
+    container_name: postgres_etheria
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: EtheriaGlobal
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./Scripts/Etheria Global:/docker-entrypoint-initdb.d
+
+  postgres_central:
+    image: postgres:17-alpine
+    container_name: postgres_central
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: RepositorioCentralCaso2
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./ETL/Scripts:/docker-entrypoint-initdb.d
+
+  mysql:
+    image: mysql:8.4
+    container_name: mysql_dynamic
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: DynamicBrands
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./Scripts/Dynamic Brands:/docker-entrypoint-initdb.d
+
+  etl:
+    build: ./ETL
+    container_name: etl_process
+    depends_on:
+      - postgres_etheria
+      - postgres_central
+      - mysql
+    command: ["python", "procesoETL.py"]

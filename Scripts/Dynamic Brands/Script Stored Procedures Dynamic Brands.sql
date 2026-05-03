@@ -720,6 +720,6 @@ CALL sp_llenado_transaccional_masivo();
 
 -- Revisar logs registrados --
 
-USE DynamicBrands;
+-- USE DynamicBrands;
 
-SELECT * FROM logs ORDER BY logId DESC;
+-- SELECT * FROM logs ORDER BY logId DESC;
